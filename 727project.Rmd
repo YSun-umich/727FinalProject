@@ -1,0 +1,576 @@
+---
+title: "727project"
+author: "Yao Sun, Shengteng Yang"
+date: "2024-12-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE, 
+                      autodep=TRUE, cache.comments=FALSE,
+                      message=FALSE, warning=FALSE,
+                      fig.width=4.5, fig.height=3)
+```
+
+
+```{r, include=FALSE}
+library(tidycensus)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(purrr)
+```
+
+```{r, include=FALSE}
+census_api_key("dbfc030f58523c027b6e82fb140a5f7034e4fa69", install = TRUE, overwrite=TRUE)
+
+Sys.getenv("CENSUS_API_KEY")
+
+variables <- load_variables(2022, "acs5") 
+
+### Compile data for Washtenaw County
+
+washtenaw_population <- get_acs(geography = "tract", variables = c(
+  "B01001_001", # Total population
+  "B01001B_001", # Black alone
+  "B01001A_001", # White alone
+  "B01001C_001", # American Indian and Alaska
+  "B01001D_001", # Asian alone 
+  "B01001E_001", #Native Hawaiian 
+  "B01001F_001", #other race
+  "B01001I_001", #Latino 
+  "B06009_002", #Less than high school
+  "B06009_003", #HS grad
+  "B06009_004", #some college
+  "B06009_005", #Bachelor
+  "B06009_006", #Graduate
+  "B06010_002", #No income
+  "B06010_003", #with income
+  "B06010_004", #1-9999
+  "B06010_005", #10000-14999
+  "B06010_006", #15000-24999
+  "B06010_007", #25000-34999
+  "B06010_008", #35000-49999
+  "B06010_009", #50000-64999
+  "B06010_010", #65000-74999
+  "B06010_011", #75000 and more
+  "B19013_001", #Median household income 
+  "B01001_009",
+  "B01001_033"
+),
+  state = "MI",
+  county = "Washtenaw",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = TRUE
+)
+```
+
+```{r}
+### Compile data for Wayne County
+
+wayne_population <- get_acs(geography = "tract", variables = c( 
+  "B01001_001", # Total population
+  "B01001B_001", # Black alone
+  "B01001A_001", # White alone
+  "B01001C_001", # American Indian and Alaska
+  "B01001D_001", # Asian alone 
+  "B01001E_001", #Native Hawaiian 
+  "B01001F_001", #other race
+  "B01001I_001", #Latino 
+  "B06009_002", #Less than high school
+  "B06009_003", #HS grad
+  "B06009_004", #some college
+  "B06009_005", #Bachelor
+  "B06009_006", #Graduate
+  "B06010_002", #No income
+  "B06010_003", #with income
+  "B06010_004", #1-9999
+  "B06010_005", #10000-14999
+  "B06010_006", #15000-24999
+  "B06010_007", #25000-34999
+  "B06010_008", #35000-49999
+  "B06010_009", #50000-64999
+  "B06010_010", #65000-74999
+  "B06010_011", #75000 and more 
+  "B19013_001", #Median household income 
+  "B01001_009",
+  "B01001_033"
+),
+  state = "MI",
+  county = "Wayne",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = TRUE
+)
+```
+
+```{r}
+### Draw map for Washtenw County population distribution
+
+sum(washtenaw_population$B01001_001E)
+sum(wayne_population$B01001_001E)
+
+ggplot(washtenaw_population) +
+geom_sf(aes(fill = B01001_001E), color = "white", size = 0.2) +
+scale_fill_viridis_c(option = "rocket", name = "Population") +
+labs(
+title = "Population Distribution in Washtenaw County",
+subtitle = "Table 1.1 2022 American Community Survey",
+caption = "Source: U.S. Census Bureau"
+) +
+theme_minimal() +
+theme(
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+panel.grid = element_blank()
+)
+
+### Draw map for Wayne County population distribution
+
+ggplot(wayne_population) +
+geom_sf(aes(fill = B01001_001E), color = "white", size = 0.2) +
+scale_fill_viridis_c(option = "rocket", name = "Population") +
+labs(
+title = "Population Distribution in Wayne County",
+subtitle = "2022 American Community Survey",
+caption = "Source: U.S. Census Bureau"
+) +
+theme_minimal() +
+theme(
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+panel.grid = element_blank()
+)
+```
+
+```{r}
+### Draw map for Washtenw County mean income level distribution
+
+ggplot(washtenaw_population) + geom_sf(aes(fill = B19013_001E), color = "white", size = 0.2) +
+scale_fill_viridis_c(option = "rocket", name = "") +
+labs(
+title = "Median household income in Washtenaw County",
+subtitle = "2022 American Community Survey",
+caption = "Source: U.S. Census Bureau"
+) +
+theme_minimal() +
+theme(
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+panel.grid = element_blank()
+)
+
+### Draw map for Wayne County mean income level distribution
+
+ggplot(wayne_population) + geom_sf(aes(fill = B19013_001E), color = "white", size = 0.2) +
+scale_fill_viridis_c(option = "rocket", name = "") +
+labs(
+title = "Median household income in Wayne County",
+subtitle = "2022 American Community Survey",
+caption = "Source: U.S. Census Bureau"
+) +
+theme_minimal() +
+theme(
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+panel.grid = element_blank()
+)
+```
+
+```{r}
+### Draw map for Two Counties' education level distribution
+
+washtenaw_population$edu_proportion <- washtenaw_population %>% 
+  group_by(NAME) %>%
+  summarize(
+    proportion = sum(B06009_005E+B06009_006E, na.rm = TRUE) / sum(B06009_002E+B06009_003E+B06009_004E+B06009_005E+B06009_006E)
+  )
+
+wayne_population$edu_proportion <- wayne_population %>% 
+  group_by(NAME) %>%
+  summarize(
+    proportion = sum(B06009_005E+B06009_006E, na.rm = TRUE) / sum(B06009_002E+B06009_003E+B06009_004E+B06009_005E+B06009_006E)
+  )
+ 
+ggplot(washtenaw_population) + geom_sf(aes(fill = edu_proportion$proportion), color = "white", size = 0.2) +
+scale_fill_viridis_c(option = "rocket", name = "") +
+labs(
+title = "Proportion of Bachelor and Grad(Prof degree) in Washtenaw County",
+subtitle = "2022 American Community Survey",
+caption = "Source: U.S. Census Bureau"
+) +
+theme_minimal() +
+theme(
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+panel.grid = element_blank()
+)
+
+ggplot(wayne_population) + geom_sf(aes(fill = edu_proportion$proportion), color = "white", size = 0.2) +
+scale_fill_viridis_c(option = "rocket", name = "") +
+labs(
+title = "Proportion of Bachelor and Grad(Prof degree) in Wayne County",
+subtitle = "2022 American Community Survey",
+caption = "Source: U.S. Census Bureau"
+) +
+theme_minimal() +
+theme(
+axis.text = element_blank(),
+axis.ticks = element_blank(),
+panel.grid = element_blank()
+)
+```
+
+```{r}
+vars <- c(
+  "B01001_001",  # Total population
+  "B01001A_001",  # White alone
+  "B01001B_001",  # Black or African American alone
+  "B01001C_001",  # American Indian and Alaska Native alone
+  "B01001D_001",  # Asian alone
+  "B01001E_001",  # Native Hawaiian and Other Pacific Islander alone
+  "B01001F_001",  # Some other race alone
+  "B01001G_001",
+  "B01001I_001",  # Hispanic or Latino Origin
+  
+  "B19013_001",   # Median Household Income for Total population
+  "B19013A_001",  # Median Household Income for White Alone
+  "B19013B_001",  # Median Household Income for Black or African American Alone
+  "B19013C_001",  # Median Household Income for American Indian and Alaska Native Alone
+  "B19013D_001",  # Median Household Income for Asian Alone
+  "B19013E_001",  # Median Household Income for Native Hawaiian and Other Pacific Islander Alone
+  "B19013F_001",  # Median Household Income for Some Other Race Alone
+  "B19013G_001",
+  "B19013H_001" # Median Household Income for Hispanic or Latino Origin
+)
+
+washtenaw_data <- get_acs(
+  geography = "tract",
+  variables = vars,
+  state = "MI",
+  county = "Washtenaw",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = FALSE
+)
+
+wayne_data <- get_acs(
+  geography = "tract",
+  variables = vars,
+  state = "MI",
+  county = "Wayne",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = FALSE
+)
+
+combined_data <- bind_rows(
+  washtenaw_data %>% mutate(County = "Washtenaw"),
+  wayne_data %>% mutate(County = "Wayne")
+)
+
+combined_data_long <- pivot_longer(
+  combined_data,
+  cols = starts_with("B"),
+  names_to = "variable",
+  values_to = "estimate"
+)
+```
+
+```{r}
+race_labels <- c(
+  "B01001_001E" = "Total",
+  "B01001A_001E" = "White",
+  "B01001B_001E" = "Black or African American",
+  "B01001C_001E" = "American Indian and Alaska Native",
+  "B01001D_001E" = "Asian",
+  "B01001E_001E" = "Native Hawaiian and Other Pacific Islander",
+  "B01001F_001E" = "Some other race",
+  "B01001G_001E" = "Two or more races",
+  "B01001I_001E"  = "Hispanic or Latino Origin"
+)
+income_labels <- c(
+  "B19013_001E"= "Overall",
+  "B19013A_001E"="White",  
+  "B19013B_001E"= "Afri", 
+  "B19013C_001E" = "Ind&Alas", 
+  "B19013D_001E"= "Asian",  
+  "B19013E_001E"= "Hawi&Paci",  
+  "B19013F_001E"= "Other",  
+  "B19013G_001E"="Multi",
+  "B19013H_001E"= "Hisp&Latin")
+```
+
+```{r}
+combined_data_long <- combined_data_long %>%
+  mutate(race = ifelse(variable %in% names(race_labels),
+                       race_labels[variable],NA))%>%
+  mutate(income = ifelse(variable %in% names(income_labels),
+                       income_labels[variable],NA))
+```
+
+```{r}
+income_data <- combined_data_long %>%
+  filter(!is.na(income)) %>% 
+  rename(income_value = estimate) %>% 
+  select(GEOID, County, income,income_value)
+
+combined_data_long <- combined_data_long %>%
+  filter(!is.na(race))
+
+income_data <- income_data %>%
+  filter(!is.na(income_value))
+
+combined_data_long <- combined_data_long %>%
+  filter(variable != "B19013_001") %>% 
+  left_join(income_data, by = c("GEOID", "County"))%>%
+  filter(!is.na(income_value))%>%
+  filter(!is.na(income.y))
+
+combined_data_long <- combined_data_long %>%
+  mutate(income.y = factor(income.y, levels = c(
+    "White", "Afri", "Ind&Alas",
+    "Asian", "Hawi&Paci","Hisp&Latin" ,
+    "Multi", "Other", "Overall"
+  )))
+```
+
+```{r}
+ggplot(combined_data_long, aes(x = income.y, y = income_value, fill = County)) +
+  geom_boxplot() +
+  facet_wrap(~ County) +
+  labs(title = "Income Distribution by Race",
+       x = "Race",
+       y = "Median Household Income") +
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size=6),
+        axis.title.x = element_text(size=8),
+        axis.text.y = element_text(size = 6),
+        axis.title.y = element_text(size=8),
+        legend.title = element_text(size = 4),
+        legend.text = element_text(size = 4),
+        legend.key.size = unit(1, "lines"),         # 图例键大小
+        legend.background = element_rect(size = 0.25),
+        plot.title = element_text(size = 10,hjust = 0.5),   # 主标题大小
+        plot.subtitle = element_text(size = 7),# 子标题大小，设置为大写
+        strip.text = element_text(size = 7),
+        legend.position = "none"
+    )
+```
+
+```{r}
+education_vars <- c(
+  "B15003_001",  # Total
+  "B15003_017",  # High school graduate (includes equivalency)
+  "B15003_019",  # Some college, no degree
+  "B15003_021",  # Associate's degree
+  "B15003_022",  # Bachelor's degree
+  "B15003_023",  # Master's degree
+  "B15003_024",  # Professional school degree
+  "B15003_025"   # Doctorate degree
+)
+
+washtenaw_data <- get_acs(
+  geography = "county",
+  variables = education_vars,
+  state = "MI",
+  county = "Washtenaw",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = FALSE
+)
+
+wayne_data <- get_acs(
+  geography = "county",
+  variables = education_vars,
+  state = "MI",
+  county = "Wayne",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = FALSE
+)
+
+combined_data <- bind_rows(
+  washtenaw_data %>% mutate(County = "Washtenaw"),
+  wayne_data %>% mutate(County = "Wayne")
+)
+```
+
+```{r}
+education_labels <- c(
+  "B15003_001E" = "Total",
+  "B15003_017E" = "High school graduate",
+  "B15003_019E" = "Some college, no degree",
+  "B15003_021E" = "Associate's degree",
+  "B15003_022E" = "Bachelor's degree",
+  "B15003_023E" = "Master's degree",
+  "B15003_024E" = "Professional school degree",
+  "B15003_025E" = "Doctorate degree"
+)
+
+combined_data_long <- combined_data %>%
+  pivot_longer(cols = starts_with("B"), names_to = "variable", values_to = "estimate") %>%
+  mutate(Education_Level = education_labels[variable])
+```
+
+```{r}
+combined_data_filtered <- combined_data_long %>%
+  #filter(variable != "B15003_001")%>%
+  filter(!is.na(Education_Level))
+```
+
+```{r}
+total_counts <- combined_data_filtered %>%
+  filter(variable == "B15003_001E")
+cata_counts <- combined_data_filtered %>%
+  filter(variable != "B15003_001E")
+```
+
+```{r}
+education_order <- c(
+  "High school graduate",
+  "Some college, no degree",
+  "Associate's degree",
+  "Bachelor's degree",
+  "Master's degree",
+  "Professional school degree",
+  "Doctorate degree"
+)
+
+combined_data_percentage <- cata_counts %>%
+  left_join(total_counts, by = c("County")) %>%
+  mutate(percentage = estimate.x / estimate.y * 100)%>%
+  mutate(Education_Level.x = factor(Education_Level.x, levels = education_order))
+```
+
+```{r}
+print("Final Data for Plotting Structure:")
+str(combined_data_percentage)
+print("Final Data for Plotting Summary:")
+summary(combined_data_percentage)
+
+ggplot(combined_data_percentage, aes(x = "", y = percentage, fill = Education_Level.x)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  facet_wrap(~ County) +
+  labs(title = "Educational Distribution in Washtenaw and Wayne",
+       fill = "Education Level") +
+  theme(
+    axis.text.x = element_blank(),       # 隐藏x轴文本
+    axis.ticks = element_blank(),        # 隐藏x轴刻度
+    plot.title = element_text(size = 10, face = "bold", hjust = 0.5),  # 主标题大小并居中
+    legend.title = element_text(size = 7),       # 图例标题大小
+    legend.text = element_text(size = 7),# 图例文本大小
+    
+  )
+
+
+```
+
+```{r}
+race_vars <- c(
+  "B02001_001",  # Total
+  "B02001_002",  # White alone
+  "B02001_003",  # Black or African American alone
+  "B02001_004",  # American Indian and Alaska Native alone
+  "B02001_005",  # Asian alone
+  "B02001_006",  # Native Hawaiian and Other Pacific Islander alone
+  "B02001_007",  # Some other race alone
+  "B02001_008"   # Two or more races
+)
+
+washtenaw_data <- get_acs(
+  geography = "county",
+  variables = race_vars,
+  state = "MI",
+  county = "Washtenaw",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = FALSE
+)
+
+wayne_data <- get_acs(
+  geography = "county",
+  variables = race_vars,
+  state = "MI",
+  county = "Wayne",
+  year = 2022,
+  survey = "acs5",
+  output = "wide",
+  geometry = FALSE
+)
+
+combined_data <- bind_rows(
+  washtenaw_data %>% mutate(County = "Washtenaw"),
+  wayne_data %>% mutate(County = "Wayne")
+)
+
+race_labels <- c(
+  "B02001_001E" = "Total",
+  "B02001_002E" = "White",
+  "B02001_003E" = "Afri",
+  "B02001_004E" = "Ind&Alas",
+  "B02001_005E" = "Asian",
+  "B02001_006E" = "Hawi&Paci",
+  "B02001_007E" = "Other",
+  "B02001_008E" = "Multi"
+)
+
+combined_data_long <- combined_data %>%
+  pivot_longer(cols = starts_with("B"), names_to = "variable", values_to = "estimate") %>%
+  mutate(Race = race_labels[variable])
+```
+
+```{r}
+combined_data_filtered <- combined_data_long %>%
+  filter(!is.na(Race))
+```
+
+```{r}
+total_counts <- combined_data_filtered %>%
+  filter(variable == "B02001_001E")
+
+cata_counts <- combined_data_filtered %>%
+  filter(variable != "B02001_001E")
+```
+
+```{r}
+combined_data_percentage <- cata_counts %>%
+  left_join(total_counts, by = c("County")) %>%
+  mutate(percentage = estimate.x / estimate.y * 100)
+```
+
+```{r}
+print("Final Data for Plotting Structure:")
+str(combined_data_percentage)
+print("Final Data for Plotting Summary:")
+summary(combined_data_percentage)
+
+ggplot(combined_data_percentage, aes(x = "", y = percentage, fill = Race.x)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  facet_wrap(~ County) +
+  labs(title = "Race Distribution in Washtenaw and Wayne",
+       fill = "Race") +
+  theme(
+    axis.text.x = element_blank(),       
+    axis.ticks = element_blank(),        
+    plot.title = element_text(size = 10, face = "bold", hjust = 0.5),  
+    legend.title = element_text(size = 7),       
+    legend.text = element_text(size = 7)         
+  )
+
+```
+
+
+
